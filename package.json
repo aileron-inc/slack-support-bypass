@@ -1,0 +1,21 @@
+{
+  "name": "slack-support-bypass",
+  "version": "0.0.1",
+  "private": true,
+  "license": "MIT",
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev --port 43123 --ip 127.0.0.1",
+    "deploy": "wrangler deploy",
+    "sync-config": "node scripts/sync-home-config.mjs",
+    "test": "vitest run",
+    "typecheck": "wrangler types && tsc --noEmit -p tsconfig.json"
+  },
+  "devDependencies": {
+    "@cloudflare/vitest-pool-workers": "^0.12.10",
+    "@types/node": "^22.20.3",
+    "typescript": "^5.9.2",
+    "vitest": "^3.2.4",
+    "wrangler": "^4.37.1"
+  }
+}
