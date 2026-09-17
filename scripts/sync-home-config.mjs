@@ -1,4 +1,8 @@
 #!/usr/bin/env node
+/**
+ * Copy ~/.slack-support-bypass/{routes.json,secrets.env} into .dev.vars.
+ * The Worker never reads the home directory at runtime; wrangler injects env.
+ */
 import { homedir } from "node:os";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
@@ -21,10 +25,9 @@ if (!existsSync(routesPath) || !existsSync(secretsPath)) {
     `Missing home-dir config.\n` +
       `  expected: ${routesPath}\n` +
       `            ${secretsPath}\n` +
-      `Copy the samples, then edit real values outside git:\n` +
-      `  mkdir -p ${homeDir}\n` +
-      `  cp routes.example.json ${routesPath}\n` +
-      `  cp secrets.env.example ${secretsPath}`,
+      `Expected operator files (not in git):\n` +
+      `  ~/.slack-support-bypass/routes.json\n` +
+      `  ~/.slack-support-bypass/secrets.env`,
   );
   process.exit(1);
 }

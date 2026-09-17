@@ -5,15 +5,14 @@ worker-configuration.d.ts
 .dev.vars.local
 .env
 .env.*
-!.env.example
 dist/
 *.log
 .DS_Store
 
-# Operator route tables (team IDs) must never be committed.
+# Operator route tables and secrets must never be committed.
 routes.json
 !routes.example.json
-
-# Local copies of home-dir secrets.
 secrets/
 secrets.env
+secrets.env.example
+agent-tools/
