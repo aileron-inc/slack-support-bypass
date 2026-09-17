@@ -27,7 +27,7 @@ if (!existsSync(routesPath) || !existsSync(secretsPath)) {
       `            ${secretsPath}\n` +
       `Expected operator files (not in git):\n` +
       `  ~/.slack-support-bypass/routes.json\n` +
-      `  ~/.slack-support-bypass/secrets.env`,
+      `  ~/.slack-support-bypass/secrets.env`
   );
   process.exit(1);
 }

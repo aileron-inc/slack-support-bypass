@@ -2,12 +2,16 @@
   "$schema": "./node_modules/wrangler/config-schema.json",
   "name": "slack-support-bypass",
   "main": "src/index.ts",
+  // Deploy target is the aileron-inc Cloudflare account.
+  // Do not hardcode a Cajon account_id here. Set one of:
+  //   export CLOUDFLARE_ACCOUNT_ID=<aileron-inc account id>
+  //   wrangler deploy --account-id <aileron-inc account id>
   "compatibility_date": "2026-09-17",
   "compatibility_flags": ["nodejs_compat"],
   "observability": {
     "enabled": true,
     "logs": {
-      "head_sampling_rate": 1
-    }
-  }
+      "head_sampling_rate": 1,
+    },
+  },
 }

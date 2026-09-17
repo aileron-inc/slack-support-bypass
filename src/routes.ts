@@ -24,6 +24,7 @@ function isRouteConfig(value: unknown): value is RouteConfig {
   );
 }
 
+/** Parse operator route table from env.ROUTES_JSON (home-dir file, injected at dev/deploy). */
 export function loadRoutes(env: Env): RouteConfig[] {
   const raw = env.ROUTES_JSON;
   if (!raw) return [];
@@ -53,6 +54,7 @@ export function normalizePath(pathname: string): string {
   return pathname;
 }
 
+/** Path lookup against injected route data. No company-name switch. */
 export function routeFromPath(
   pathname: string,
   routes: readonly RouteConfig[],

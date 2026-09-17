@@ -61,6 +61,7 @@ async function signedRequest(
   path: string,
   secret: string,
   payload: unknown,
+  extraHeaders: Record<string, string> = {},
 ): Promise<Request<unknown, IncomingRequestCfProperties>> {
   const rawBody = JSON.stringify(payload);
   const timestamp = String(Math.floor(Date.now() / 1000));
@@ -70,6 +71,7 @@ async function signedRequest(
       "content-type": "application/json",
       "x-slack-request-timestamp": timestamp,
       "x-slack-signature": await slackSignature(secret, timestamp, rawBody),
+      ...extraHeaders,
     },
     body: rawBody,
   });
@@ -102,19 +104,25 @@ describe("verifySlackSignature", () => {
   it("accepts a valid current signature", async () => {
     const timestamp = String(Math.floor(Date.now() / 1000));
     const signature = await slackSignature(secret, timestamp, body);
-    expect(await verifySlackSignature(secret, timestamp, signature, body)).toBe(true);
+    expect(await verifySlackSignature(secret, timestamp, signature, body)).toBe(
+      true,
+    );
   });
 
   it("rejects a wrong secret", async () => {
     const timestamp = String(Math.floor(Date.now() / 1000));
     const signature = await slackSignature("other", timestamp, body);
-    expect(await verifySlackSignature(secret, timestamp, signature, body)).toBe(false);
+    expect(await verifySlackSignature(secret, timestamp, signature, body)).toBe(
+      false,
+    );
   });
 
   it("rejects a replayed timestamp", async () => {
     const timestamp = String(Math.floor(Date.now() / 1000) - 400);
     const signature = await slackSignature(secret, timestamp, body);
-    expect(await verifySlackSignature(secret, timestamp, signature, body)).toBe(false);
+    expect(await verifySlackSignature(secret, timestamp, signature, body)).toBe(
+      false,
+    );
   });
 
   it("rejects missing headers", async () => {
@@ -129,6 +137,7 @@ describe("route lookup from injected data", () => {
     expect(routes.map((route) => route.name)).toEqual(
       routesExample.routes.map((route) => route.name),
     );
+    expect(env.ROUTES_JSON).toBe(JSON.stringify(routesExample));
   });
 
   it("maps each sample path to that route record", () => {
@@ -138,8 +147,30 @@ describe("route lookup from injected data", () => {
     }
   });
 
+  it("resolves trailing slashes via the same path data", () => {
+    expect(routeFromPath("/slack/contoso/", loadRoutes(env))?.name).toBe(
+      "contoso",
+    );
+  });
+
   it("rejects unknown paths", () => {
-    expect(routeFromPath("/slack/other", loadRoutes(env))).toBeNull();
+    const routes = loadRoutes(env);
+    expect(routeFromPath("/slack/other", routes)).toBeNull();
+    expect(routeFromPath("/acme", routes)).toBeNull();
+  });
+
+  it("keeps per-route teamId and env names on the injected rows", () => {
+    const acme = routeFromPath("/slack/acme", loadRoutes(env));
+    expect(acme?.teamId).toBe("T000FAKE1");
+    expect(acme?.signingSecretEnv).toBe("SLACK_SIGNING_SECRET_ACME");
+    expect(acme?.webhookUrlEnv).toBe("GROK_WEBHOOK_URL_ACME");
+    expect(acme?.webhookKeyEnv).toBe("GROK_WEBHOOK_KEY_ACME");
+  });
+
+  it("returns no routes when ROUTES_JSON is missing or invalid", () => {
+    expect(loadRoutes({})).toEqual([]);
+    expect(loadRoutes({ ROUTES_JSON: "not-json" })).toEqual([]);
+    expect(loadRoutes({ ROUTES_JSON: "{}" })).toEqual([]);
   });
 });
 
@@ -160,8 +191,12 @@ describe("shouldForwardEvent", () => {
   it("ignores bots, edits, and deletes", () => {
     expect(shouldForwardEvent({ ...human, bot_id: "B1" })).toBe(false);
     expect(shouldForwardEvent({ ...human, subtype: "bot_message" })).toBe(false);
-    expect(shouldForwardEvent({ ...human, subtype: "message_changed" })).toBe(false);
-    expect(shouldForwardEvent({ ...human, subtype: "message_deleted" })).toBe(false);
+    expect(shouldForwardEvent({ ...human, subtype: "message_changed" })).toBe(
+      false,
+    );
+    expect(shouldForwardEvent({ ...human, subtype: "message_deleted" })).toBe(
+      false,
+    );
   });
 });
 
@@ -196,19 +231,49 @@ describe("worker", () => {
   });
 
   it("404s unknown routes", async () => {
-    const res = await send(await signedRequest("/slack/unknown", "secret-acme", mention));
+    const res = await send(
+      await signedRequest("/slack/unknown", "secret-acme", mention),
+    );
     expect(res.status).toBe(404);
     expect(webhookCalls).toHaveLength(0);
   });
 
-  it("forwards acme events to that app webhook", async () => {
-    const res = await send(await signedRequest("/slack/acme", "secret-acme", mention));
-    expect(res.status).toBe(200);
-    expect(webhookCalls).toHaveLength(1);
-    expect(webhookCalls[0]?.url).toBe("https://grok-webhook.test/acme");
-    expect(webhookCalls[0]?.authorization).toBe("Bearer key-acme");
-    expect(webhookCalls[0]?.automationKey).toBe("key-acme");
-  });
+  it.each(
+    routesExample.routes.map((route) => [
+      route.name,
+      route.path,
+      `secret-${route.name}`,
+      `key-${route.name}`,
+      route.teamId ?? "T000FAKE1",
+    ]),
+  )(
+    "forwards %s events to that app webhook from injected route data",
+    async (name, path, secret, key, teamId) => {
+      const res = await send(
+        await signedRequest(path, secret, {
+          ...mention,
+          team_id: teamId,
+        }),
+      );
+      expect(res.status).toBe(200);
+      expect(webhookCalls).toHaveLength(1);
+      expect(webhookCalls[0]?.url).toBe(`https://grok-webhook.test/${name}`);
+      expect(webhookCalls[0]?.authorization).toBe(`Bearer ${key}`);
+      expect(webhookCalls[0]?.automationKey).toBe(key);
+      expect(webhookCalls[0]?.body).toEqual({
+        action: "slack_event",
+        route: name,
+        event_type: "app_mention",
+        channel_id: "C111",
+        thread_ts: "1710000000.000050",
+        message_ts: "1710000000.000100",
+        user_id: "U111",
+        text: "<@Ubot> hello",
+        team_id: teamId,
+        permalink: null,
+      });
+    },
+  );
 
   it("acks bot messages without forwarding", async () => {
     const res = await send(
@@ -227,6 +292,48 @@ describe("worker", () => {
     );
     expect(res.status).toBe(200);
     expect(webhookCalls).toHaveLength(0);
+  });
+
+  it("acks message_changed and message_deleted without forwarding", async () => {
+    for (const subtype of ["message_changed", "message_deleted"] as const) {
+      webhookCalls = [];
+      const res = await send(
+        await signedRequest("/slack/contoso", "secret-contoso", {
+          type: "event_callback",
+          team_id: "T000FAKE2",
+          event: {
+            type: "message",
+            subtype,
+            user: "U111",
+            text: "edited",
+            ts: "1.1",
+            channel: "C111",
+          },
+        }),
+      );
+      expect(res.status).toBe(200);
+      expect(webhookCalls).toHaveLength(0);
+    }
+  });
+
+  it("forwards a human message event", async () => {
+    const res = await send(
+      await signedRequest("/slack/contoso", "secret-contoso", {
+        type: "event_callback",
+        team_id: "T000FAKE2",
+        event: {
+          type: "message",
+          user: "U222",
+          text: "help",
+          ts: "2.2",
+          channel: "C222",
+        },
+      }),
+    );
+    expect(res.status).toBe(200);
+    expect(webhookCalls).toHaveLength(1);
+    expect(webhookCalls[0]?.body.thread_ts).toBeNull();
+    expect(webhookCalls[0]?.body.event_type).toBe("message");
   });
 
   it("acks events from the wrong team without forwarding", async () => {
