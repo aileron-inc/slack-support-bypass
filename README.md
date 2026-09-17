@@ -48,7 +48,7 @@ Plaintext is fine. The Worker never reads the home directory at runtime. Dev and
 
 Override the home directory with `SLACK_SUPPORT_BYPASS_HOME` if needed.
 
-[`routes.example.json`](./ro{[es.example.json) is a **sample shape only** (fake names `acme` / `contoso`, fake team IDs `T000FAKE1` / `T000FAKE2`). Do not treat it as the operator table.
+[`routes.example.json`](./routes.example.json) is a **sample shape only** (fake names `acme` / `contoso`, fake team IDs `T000FAKE1` / `T000FAKE2`). Do not treat it as the operator table.
 
 ### Local
 
