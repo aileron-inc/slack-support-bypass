@@ -1,0 +1,20 @@
+{
+  "routes": [
+    {
+      "name": "acme",
+      "path": "/slack/acme",
+      "teamId": "T000FAKE1",
+      "signingSecretEnv": "SLACK_SIGNING_SECRET_ACME",
+      "webhookUrlEnv": "GROK_WEBHOOK_URL_ACME",
+      "webhookKeyEnv": "GROK_WEBHOOK_KEY_ACME"
+    },
+    {
+      "name": "contoso",
+      "path": "/slack/contoso",
+      "teamId": "T000FAKE2",
+      "signingSecretEnv": "SLACK_SIGNING_SECRET_CONTOSO",
+      "webhookUrlEnv": "GROK_WEBHOOK_URL_CONTOSO",
+      "webhookKeyEnv": "GROK_WEBHOOK_KEY_CONTOSO"
+    }
+  ]
+}
